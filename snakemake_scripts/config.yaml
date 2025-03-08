@@ -1,0 +1,3 @@
+data_folder: '/specific/netapp5/gaga/data-scratch/ronsaad/aneuploidy/data'
+out_folder: '/specific/netapp5/gaga/data-scratch/ronsaad/aneuploidy/output/snakemake_final_2'
+log_folder: '/specific/netapp5/gaga/data-scratch/ronsaad/aneuploidy/log/snakemake_final_2'

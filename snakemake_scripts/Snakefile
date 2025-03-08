@@ -1,0 +1,413 @@
+# ------------------------------------------------------------------------------
+# Snakefile for Cancer CNV and Mutation Analysis
+#
+# This workflow uses several R scripts to process TCGA data and generate
+# various outputs:
+#   - Mutation matrices and SQLite database from raw mutation data
+#   - Processed mutation data (CSV)
+#   - CNV matrices (focal/broad, LOH events, probabilities)
+#   - Gene features table (merging mutation, CNV, and annotation data)
+#   - Aneuploid sample groups
+#
+# The workflow configuration is provided via "config.yaml". The config file
+# should define paths for output folders, log folders, data folders, arms,
+# cancer_types, and the R profile (r_profile).
+#
+# Usage:
+#   snakemake --cores <n>
+#
+# ------------------------------------------------------------------------------
+configfile: "config.yaml"
+
+import pandas as pd
+
+# Read arm and cancer type pairs from a CSV file for pairing inputs
+pairs_df = pd.read_csv(config["data_folder"] + "/arm_deletion_frequencies.csv")
+pairs = list(pairs_df.itertuples(index=False, name=None))
+
+rule test:
+  input:
+    config["out_folder"] + "/X17p/BRCA/aneuploid_mutations.tsv"
+    
+# ------------------------------------------------------------------------------
+# Rule: all
+# Purpose: Define the final targets of the workflow.
+# ------------------------------------------------------------------------------
+rule all:
+    input:
+        expand(config["out_folder"] + "/{arm}/{cancer_type}/gene_features.csv",
+               zip,
+               arm=list(pairs_df["arm"]),
+               cancer_type=list(pairs_df["cancer.type"])),
+        expand(config["out_folder"] + "/{arm}/{cancer_type}/C2_CP:REACTOME_IPTW_controlled_GSEA.csv",
+               zip,
+               arm=list(pairs_df["arm"]),
+               cancer_type=list(pairs_df["cancer.type"])),
+        expand(config["out_folder"] + "/{arm}/{cancer_type}/C2_CP:REACTOME_GSEA_aneuploid_vs_normal.csv",
+               zip,
+               arm=list(pairs_df["arm"]),
+               cancer_type=list(pairs_df["cancer.type"])),
+        expand(config["out_folder"] + "/{arm}/{cancer_type}/H_Null_IPTW_controlled_GSEA.csv",
+               zip,
+               arm=list(pairs_df["arm"]),
+               cancer_type=list(pairs_df["cancer.type"])),
+        expand(config["out_folder"] + "/{arm}/{cancer_type}/H_Null_GSEA_aneuploid_vs_normal.csv",
+               zip,
+               arm=list(pairs_df["arm"]),
+               cancer_type=list(pairs_df["cancer.type"])),
+        expand(config["out_folder"] + "/{arm}/{cancer_type}/aneuploid.seg",
+               zip,
+               arm=list(pairs_df["arm"]),
+               cancer_type=list(pairs_df["cancer.type"])),
+        expand(config["out_folder"] + "/{arm}/{cancer_type}/aneuploid_mutations.tsv",
+               zip,
+               arm=list(pairs_df["arm"]),
+               cancer_type=list(pairs_df["cancer.type"])),
+
+# ------------------------------------------------------------------------------
+# Rule: filter_mutations_data
+# Purpose: Filter mutation data from an SQLite database by a provided list of 
+#          sample IDs. The R script "filter_mutations_data.R" reads the mutations 
+#          table from the SQLite database, filters the rows based on sample IDs 
+#          (from a CSV file), and writes the filtered data to a TSV file.
+# ------------------------------------------------------------------------------
+rule create_mutations_files:
+    input:
+        db_file = config["data_folder"] + "/MC3MAF.sqlite",
+        aneuploid_samples = config["out_folder"] + "/{arm}/{cancer_type}/aneuploid_samples.csv",
+        non_aneuploid_samples = config["out_folder"] + "/{arm}/{cancer_type}/non_aneuploid_samples.csv"
+    output:
+        config["out_folder"] + "/{arm}/{cancer_type}/aneuploid_mutations.tsv",
+        config["out_folder"] + "/{arm}/{cancer_type}/non_aneuploid_mutations.tsv"
+    log:
+        config["log_folder"] + "/{arm}/{cancer_type}/create_mutations_files.log"
+    shell:
+        """
+        mkdir -p {config[out_folder]}/{wildcards.arm}/{wildcards.cancer_type} \
+        {config[log_folder]}{wildcards.arm}//{wildcards.cancer_type}
+        Rscript --no-save --no-restore create_mutation_files.R \
+            --db-file {input.db_file} \
+            --aneuploid-samples-path {input.aneuploid_samples} \
+            --non-aneuploid-samples-path {input.non_aneuploid_samples} \
+            --out {config[out_folder]}/{wildcards.arm}/{wildcards.cancer_type} \
+            > {log} 2>&1
+        """
+
+# ------------------------------------------------------------------------------
+# Rule: filter_seg_files
+# Purpose: Filter a segmentation (.seg) file based on two sample lists (aneuploid 
+#          and non-aneuploid) and generate two new segmentation files containing 
+#          only the relevant samples.
+# ------------------------------------------------------------------------------
+rule create_seg_files:
+    input:
+        seg_file = config["data_folder"] + "/gistic/seg_files/{cancer_type}/{cancer_type}.snp__genome_wide_snp_6__broad_mit_edu__Level_3__segmented_scna_minus_germline_cnv_hg19__seg.seg.txt",
+        aneuploid_samples = config["out_folder"] + "/{arm}/{cancer_type}/aneuploid_samples.csv",
+        non_aneuploid_samples = config["out_folder"] + "/{arm}/{cancer_type}/non_aneuploid_samples.csv"
+    output:
+        config["out_folder"] + "/{arm}/{cancer_type}/aneuploid.seg",
+        config["out_folder"] + "/{arm}/{cancer_type}/non_aneuploid.seg"
+    log:
+        config["log_folder"] + "/{arm}/{cancer_type}/create_seg_files.log"
+    shell:
+        """
+        mkdir -p {config[out_folder]}/{wildcards.arm}/{wildcards.cancer_type} \
+        {config[log_folder]}/{wildcards.arm}/{wildcards.cancer_type}
+        Rscript --no-save --no-restore create_seg_files.R \
+            --seg-path {input.seg_file} \
+            --aneuploid-samples-path {input.aneuploid_samples} \
+            --non-aneuploid-samples-path {input.non_aneuploid_samples} \
+            --out {config[out_folder]}/{wildcards.arm}/{wildcards.cancer_type} \
+            > {log} 2>&1
+        """
+
+# ------------------------------------------------------------------------------
+# Rule: run_GSEA
+# Purpose: Run Gene Set Enrichment Analysis (GSEA) on differential expression (DEG)
+#          results using the R script "run_GSEA.R". The script takes as input a DEG
+#          CSV file (generated from differential expression analysis), a gene set
+#          category (and subcategory) provided as a single parameter (e.g., "HALLMARK_Null"),
+#          and a comparison label (used as a suffix). It outputs a CSV file containing
+#          the GSEA results.
+#
+# ------------------------------------------------------------------------------
+rule run_GSEA:
+    input:
+        deg_path = config["out_folder"] + "/{arm}/{cancer_type}/{comparison}_deg.csv"
+    output:
+        config["out_folder"] + "/{arm}/{cancer_type}/{category}_GSEA_{comparison}.csv"
+    log:
+        config["log_folder"] + "/{arm}/{cancer_type}/{category}_GSEA_{comparison}.log"
+    shell:
+        """
+        mkdir -p {config[out_folder]}/{wildcards.arm}/{wildcards.cancer_type} \
+                {config[log_folder]}/{wildcards.arm}/{wildcards.cancer_type}
+        Rscript --no-save --no-restore run_GSEA.R \
+            --deg-path {input.deg_path} \
+            --category {wildcards.category} \
+            --suffix {wildcards.comparison} \
+            --out {config[out_folder]}/{wildcards.arm}/{wildcards.cancer_type} \
+            > {log} 2>&1
+        """
+
+# ------------------------------------------------------------------------------
+# Rule: generate_AS_controlled_GSEA
+# Purpose: Run a controlled Gene Set Enrichment Analysis (GSEA) on the differential 
+#          expression results produced by the IPTW analysis. The R script "generate_AS_controlled_GSEA.R"
+#          uses the DEG results (IPTW_anp_effect.csv), the specified chromosome arm, and the 
+#          gene set category (with subcategory) to perform GSEA using msigdbr and clusterProfiler.
+#
+# ------------------------------------------------------------------------------
+rule generate_AS_controlled_GSEA:
+    input:
+        deg_path = config["out_folder"] + "/{arm}/{cancer_type}/IPTW_anp_effect.csv"
+    output:
+        controlled_gsea = config["out_folder"] + "/{arm}/{cancer_type}/{category}_IPTW_controlled_GSEA.csv"
+    log:
+        config["log_folder"] + "/{arm}/{cancer_type}/{category}_generate_AS_controlled_GSEA.log"
+    shell:
+        """
+        mkdir -p {config[out_folder]}/{wildcards.arm}/{wildcards.cancer_type} {config[log_folder]}/{wildcards.arm}/{wildcards.cancer_type}
+        Rscript --no-save --no-restore generate_AS_controlled_GSEA.R \
+            --arm {wildcards.arm} \
+            --deg-path {input.deg_path} \
+            --category {wildcards.category} \
+            --out {config[out_folder]}/{wildcards.arm}/{wildcards.cancer_type} \
+            > {log} 2>&1
+        """
+
+# ------------------------------------------------------------------------------
+# Rule: generate_IPTW_anp_effect
+# Purpose: Calculate the effect of arm-level deletion on gene expression using
+#          raw counts and additional ANP data. The R script "calculate_anp_effect.R"
+#          performs differential expression analysis using inverse probability 
+#          of treatment weighting (IPTW) and returns a CSV file with p-values, 
+#          effect sizes, and adjusted q-values for each gene.
+# ------------------------------------------------------------------------------
+rule generate_IPTW_anp_effect:
+    input:
+        raw_counts_path = config["data_folder"] + "/STAR/{cancer_type}.rds",
+        anp_csv_path = config["data_folder"] + "/Taylor_et_al._Arm-Level_WGD_TCGA_data.csv"
+    output:
+        config["out_folder"] + "/{arm}/{cancer_type}/IPTW_anp_effect.csv"
+    log:
+        config["log_folder"] + "/{arm}/{cancer_type}/generate_IPTW_anp_effect.log"
+    shell:
+        """
+        mkdir -p {config[out_folder]}/{wildcards.arm}/{wildcards.cancer_type} \
+                {config[log_folder]}/{wildcards.arm}/{wildcards.cancer_type}
+        Rscript --no-save --no-restore calculate_anp_effect.R \
+            --cancer-type {wildcards.cancer_type} \
+            --arm {wildcards.arm} \
+            --raw-counts-path {input.raw_counts_path} \
+            --anp-csv-path {input.anp_csv_path} \
+            --out {config[out_folder]}/{wildcards.arm}/{wildcards.cancer_type} \
+            > {log} 2>&1
+        """
+
+# ------------------------------------------------------------------------------
+# Rule: calculate_differential_gene_expression
+# Purpose: Calculate differential gene expression between aneuploid samples
+#          and normal samples for a given cancer type using HiSeq data.
+#          The R script loads a SummarizedExperiment (HiSeq data) from an RDS file 
+#          and a CSV list of aneuploid sample IDs. Normal samples are determined
+#          from the HiSeq data (sample_type == 'Solid Tissue Normal'). 
+#          Differential expression analysis is performed using DESeq2, and log fold 
+#          change shrinkage is applied if the --shrink flag is set.
+# ------------------------------------------------------------------------------
+rule calculate_differential_gene_expression:
+    input:
+        # CSV file containing a list of aneuploid sample IDs
+        aneuploid_samples_path = config["out_folder"] + "/{arm}/{cancer_type}/aneuploid_samples.csv",
+        # HiSeq data stored as an RDS file containing a SummarizedExperiment object
+        hiSeq_data_path = config["data_folder"] + "/HiSeq/{cancer_type}_HiSeq.rds"
+    output:
+        # The differential expression results CSV file
+        deg = config["out_folder"] + "/{arm}/{cancer_type}/aneuploid_vs_normal_deg.csv"
+    log:
+        config["log_folder"] + "/{arm}/{cancer_type}/calculate_differential_gene_expression.log"
+    shell:
+        """
+        mkdir -p {config[out_folder]}/{wildcards.arm}/{wildcards.cancer_type} {config[log_folder]}/{wildcards.arm}/{wildcards.cancer_type}
+        Rscript --no-save --no-restore calculate_differential_gene_expression.R \
+            --aneuploid-samples-path {input.aneuploid_samples_path} \
+            --hiSeq-data-path {input.hiSeq_data_path} \
+            --shrink \
+            --out {config[out_folder]}/{wildcards.arm}/{wildcards.cancer_type} \
+            > {log} 2>&1
+        """
+
+
+# ------------------------------------------------------------------------------
+# Rule: generate_gene_features
+# Purpose: Merge gene annotation, mutation data, CNV probabilities, and co-deletion
+#          statistics to generate a comprehensive gene features table.
+# ------------------------------------------------------------------------------
+rule generate_gene_features:
+    input:
+        mutation_data_path = config["out_folder"] + "/{arm}/{cancer_type}/mutation_data.csv",
+        focal_given_broad_probabilities = config["out_folder"] + "/{arm}/{cancer_type}/focal_given_broad_probabilities.csv",
+        focal_given_no_broad_probabilities = config["out_folder"] + "/{arm}/{cancer_type}/focal_given_no_broad_probabilities.csv",
+        co_deletion_fisher = config["out_folder"] + "/{arm}/{cancer_type}/co_deletion_fisher.csv",
+        focal_and_broad = config["out_folder"] + "/{arm}/{cancer_type}/focal_and_broad.csv"
+    output:
+        gene_features = config["out_folder"] + "/{arm}/{cancer_type}/gene_features.csv"
+    log:
+        config["log_folder"] + "/{arm}/{cancer_type}/generate_gene_features.log"
+    shell:
+        """
+        mkdir -p {config[out_folder]}/{wildcards.arm}/{wildcards.cancer_type} \
+            {config[log_folder]}/{wildcards.arm}/{wildcards.cancer_type}
+        Rscript --no-save --no-restore generate_gene_features.R \
+            --cancer-type {wildcards.cancer_type} \
+            --arm {wildcards.arm} \
+            --mutation-data-path {input.mutation_data_path} \
+            --focal-given-broad-probabilities-path {input.focal_given_broad_probabilities} \
+            --focal-given-no-broad-probabilities-path {input.focal_given_no_broad_probabilities} \
+            --co-deletion-fisher-path {input.co_deletion_fisher} \
+            --focal-and-broad-path {input.focal_and_broad} \
+            --out {config[out_folder]}/{wildcards.arm}/{wildcards.cancer_type} \
+            > {log} 2>&1
+        """
+
+# ------------------------------------------------------------------------------
+# Rule: generate_cnv_matrices
+# Purpose: Generate CNV matrices (focal and broad CNVs/LOH events) using GISTIC data.
+# ------------------------------------------------------------------------------
+rule generate_cnv_matrices:
+    input:
+      seg_file_path = config["data_folder"] + "/gistic/seg_files/{cancer_type}/{cancer_type}.snp__genome_wide_snp_6__broad_mit_edu__Level_3__segmented_scna_minus_germline_cnv_hg19__seg.seg.txt",
+      sample_cutoffs_path = config["data_folder"] + "/gistic/{cancer_type}/sample_cutoffs.txt"
+    output:
+        focal_cnvs = config["out_folder"] + "/{arm}/{cancer_type}/focal_cnvs_matrix.csv",
+        broad_cnvs = config["out_folder"] + "/{arm}/{cancer_type}/broad_cnvs_matrix.csv",
+        focal_loh = config["out_folder"] + "/{arm}/{cancer_type}/focal_loh_cnvs_matrix.csv",
+        broad_loh = config["out_folder"] + "/{arm}/{cancer_type}/broad_loh_cnvs_matrix.csv",
+        focal_given_broad = config["out_folder"] + "/{arm}/{cancer_type}/focal_given_broad_probabilities.csv",
+        focal_given_no_broad = config["out_folder"] + "/{arm}/{cancer_type}/focal_given_no_broad_probabilities.csv",
+        co_deletion_fisher = config["out_folder"] + "/{arm}/{cancer_type}/co_deletion_fisher.csv",
+        focal_and_broad = config["out_folder"] + "/{arm}/{cancer_type}/focal_and_broad.csv"
+    log:
+        config["log_folder"] + "/{arm}/{cancer_type}/generate_cnv_matrices.log"
+    shell:
+        """
+        mkdir -p {config[out_folder]}/{wildcards.arm}/{wildcards.cancer_type} \
+            {config[log_folder]}/{wildcards.arm}/{wildcards.cancer_type}
+        Rscript --no-save --no-restore generate_cnv_matrices.R \
+            --cancer-type {wildcards.cancer_type} \
+            --arm {wildcards.arm} \
+            --seg-file-path {input.seg_file_path} \
+            --sample-cutoffs-path {input.sample_cutoffs_path} \
+            --out {config[out_folder]}/{wildcards.arm}/{wildcards.cancer_type} \
+            > {log} 2>&1
+        """
+
+# ------------------------------------------------------------------------------
+# Rule: generate_mutation_data
+# Purpose: Create processed mutation data CSV from mutation matrix and sample groups.
+# ------------------------------------------------------------------------------
+rule generate_mutation_data:
+    input:
+        mutation_matrix_path = config["out_folder"] + "/{arm}/{cancer_type}/mutation_matrix.csv",
+        broad_del_samples_path = config["out_folder"] + "/{arm}/{cancer_type}/aneuploid_samples.csv",
+        no_broad_del_samples_path = config["out_folder"] + "/{arm}/{cancer_type}/non_aneuploid_samples.csv"
+    output:
+        mutation_data = config["out_folder"] + "/{arm}/{cancer_type}/mutation_data.csv"
+    log:
+        config["log_folder"] + "/{arm}/{cancer_type}/mutation_data.log"
+    shell:
+        """
+        mkdir -p {config[out_folder]}/{wildcards.arm}/{wildcards.cancer_type} \
+            {config[log_folder]}/{wildcards.arm}/{wildcards.cancer_type}
+        Rscript --no-save --no-restore generate_mutation_data.R \
+            --mutation-matrix-path {input.mutation_matrix_path} \
+            --broad-del-samples-path {input.broad_del_samples_path} \
+            --no-broad-del-samples-path {input.no_broad_del_samples_path} \
+            --out {config[out_folder]}/{wildcards.arm}/{wildcards.cancer_type} \
+            > {log} 2>&1
+        """
+
+# ------------------------------------------------------------------------------
+# Rule: generate_mutation_matrix
+# Purpose: Generate the mutation matrix CSV file from the mutation SQLite database.
+# ------------------------------------------------------------------------------
+rule generate_mutation_matrix:
+    input:
+        mutation_db_path = config["data_folder"] + "/MC3MAF.sqlite"
+    output:
+        mutation_matrix = config["out_folder"] + "/{arm}/{cancer_type}/mutation_matrix.csv"
+    log:
+        config["log_folder"] + "/{arm}/{cancer_type}/generate_mutation_matrix.log"
+    shell:
+        """
+        mkdir -p {config[out_folder]}/{wildcards.arm}/{wildcards.cancer_type} \
+            {config[log_folder]}/{wildcards.arm}/{wildcards.cancer_type}
+        Rscript --no-save --no-restore generate_mutation_matrices.R \
+            --cancer-type {wildcards.cancer_type} \
+            --arm {wildcards.arm} \
+            --mutation-db-path {input.mutation_db_path} \
+            --out {config[out_folder]}/{wildcards.arm}/{wildcards.cancer_type} \
+            > {log} 2>&1
+        """
+
+# ------------------------------------------------------------------------------
+# Rule: generate_sample_groups
+# Purpose: Split samples into aneuploid (arm deletion) and non-aneuploid groups.
+# ------------------------------------------------------------------------------
+rule generate_sample_groups:
+    input:
+        arm_deletion_data = config["data_folder"] + "/Taylor_et_al._Arm-Level_WGD_TCGA_data.csv"
+    output:
+        aneuploid_samples = config["out_folder"] + "/{arm}/{cancer_type}/aneuploid_samples.csv",
+        non_aneuploid_samples = config["out_folder"] + "/{arm}/{cancer_type}/non_aneuploid_samples.csv"
+    log:
+        config["log_folder"] + "/{arm}/{cancer_type}/generate_sample_groups.log"
+    shell:
+        """
+        mkdir -p {config[out_folder]}/{wildcards.arm}/{wildcards.cancer_type} \
+            {config[log_folder]}/{wildcards.arm}/{wildcards.cancer_type}
+        Rscript --no-save --no-restore generate_sample_groups.R \
+            --cancer-type {wildcards.cancer_type} \
+            --arm {wildcards.arm} \
+            --arm-deletion-data-path {input.arm_deletion_data} \
+            --out {config[out_folder]}/{wildcards.arm}/{wildcards.cancer_type} \
+            > {log} 2>&1
+        """
+
+# ------------------------------------------------------------------------------
+# Rule: generate_mutation_sqldb
+# Purpose: Build the SQLite database for mutation data.
+# ------------------------------------------------------------------------------
+rule generate_mutation_sqldb:
+    output:
+        mutation_sqldb = config["data_folder"] + "/MC3MAF.sqlite"
+    log:
+        config["log_folder"] + "/generate_mutation_sqldb.log"
+    shell:
+        """
+        mkdir -p {config[data_folder]} {config[log_folder]}
+        Rscript --no-save --no-restore generate_mutation_sqldb.R \
+            --out {config[data_folder]}/MC3MAF.sqlite \
+            > {log} 2>&1
+        """
+
+# ------------------------------------------------------------------------------
+# Rule: download_gistic_data
+# Purpose: Download and extract GISTIC data for a specified cancer type.
+#          The GISTIC results are downloaded from Firebrowse and the extracted
+#          files are saved into a subdirectory of config["data_folder"] corresponding
+#          to the cancer type.
+# ------------------------------------------------------------------------------
+rule download_gistic_data:
+    output:
+        gistic_data = config["data_folder"] + "/gistic_data/{cancer_type}/all_data_by_genes.txt"
+    log:
+        config["log_folder"] + "/{cancer_type}/download_gistic_data.log"
+    shell:
+        """
+        mkdir -p {config[data_folder]}/gistic_data/{wildcards.cancer_type} {config[log_folder]}/{wildcards.cancer_type}
+        Rscript --no-save --no-restore download_gistic_data.R \
+            --cancer-type {wildcards.cancer_type} \
+            --out {config[data_folder]}/gistic_data/{wildcards.cancer_type}/ \
+            > {log} 2>&1
+        """

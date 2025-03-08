@@ -1,0 +1,52 @@
+OUT_FOLDER = "/specific/netapp5/gaga/data-scratch/ronsaad/aneuploidy/output/mono_regions2"
+LOG_FOLDER = "/specific/netapp5/gaga/data-scratch/ronsaad/aneuploidy/log/mono_regions2"
+DATA_FOLDER = "/specific/netapp5/gaga/data-scratch/ronsaad/aneuploidy/data"
+MONO_REGIONS_PATH = "/specific/netapp5/gaga/data-scratch/ronsaad/aneuploidy/output/aneuploidy_drivers/mono_cnv_regions.csv"
+
+import pandas as pd
+gistic_regions = pd.read_csv(MONO_REGIONS_PATH).head(1)
+
+rule all:
+  input:
+    expand(OUT_FOLDER + '/{index}_{cancer_type}_{arm}_{region_start}_{region_end}_res.csv',
+               zip,
+               index=list(range(1,gistic_regions.shape[0] + 1)),
+               cancer_type=list(gistic_regions["cancer.type"]),
+               arm=list(gistic_regions["arm"]),
+               region_start=list(gistic_regions["start"]),
+               region_end=list(gistic_regions["end"]))
+
+# ------------------------------------------------------------------------------
+# Rule: run_PRODIGY
+# Purpose: Analyze a genomic region defined in the GISTIC results using HiSeq 
+#          expression data, segmentation data, and pathway information. The 
+#          R script "analyse_region.R" extracts the region parameters from the 
+#          GISTIC results (based on a given index), computes differential gene 
+#          expression for that region, and runs the PRODIGY algorithm for pathway 
+#          analysis.
+# ------------------------------------------------------------------------------
+rule run_PRODIGY:
+    input:
+        hiSeq_data     = DATA_FOLDER + "/HiSeq/{cancer_type}_HiSeq.rds",
+        
+        seg_file       = DATA_FOLDER + "/gistic/seg_files/{cancer_type}/{cancer_type}.snp__genome_wide_snp_6__broad_mit_edu__Level_3__segmented_scna_minus_germline_cnv_hg19__seg.seg.txt",
+      
+        pathway_list   = "/specific/netapp5/gaga/data-scratch/ronsaad/aneuploidy/out/PRODIGY/pathways/reactome.RDS"
+    output:
+        res = OUT_FOLDER + "/{index}_{cancer_type}_{arm}_{region_start}_{region_end}_res.csv"
+    log:
+        LOG_FOLDER + "/{index}_{cancer_type}_{arm}_{region_start}_{region_end}.log"
+    shell:
+        """
+        mkdir -p {OUT_FOLDER} {LOG_FOLDER}
+        Rscript --no-save --no-restore run_PRODIGY.R \
+            --cancer-type {wildcards.cancer_type} \
+            --arm {wildcards.arm} \
+            --region-start {wildcards.region_start} \
+            --region-end {wildcards.region_end} \
+            --hiSeq-data-path {input.hiSeq_data} \
+            --seg-path {input.seg_file} \
+            --pathway-list-path {input.pathway_list} \
+            --out {OUT_FOLDER}/{wildcards.index}_{wildcards.cancer_type}_{wildcards.arm}_{wildcards.region_start}_{wildcards.region_end}_res.csv \
+            > {log} 2>&1
+        """
