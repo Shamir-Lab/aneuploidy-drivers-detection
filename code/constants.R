@@ -1,0 +1,1 @@
+DATA.DIR <- '/specific/netapp5/gaga/data-scratch/ronsaad/aneuploidy/data'
