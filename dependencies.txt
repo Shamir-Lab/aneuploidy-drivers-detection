@@ -1,0 +1,8 @@
+Linux dependencies (required for installing the R package in Debian, may be different in other distributions/versions):
+sudo apt-get install libxml2 libxml2-dev libglpk40 libz-dev libbz2-dev liblzma-dev libfontconfig1-dev cmake libcurl4-openssl-dev 
+
+R dependencies:
+install.packages(c('plyr','dplyr','tidyr','purrr','stringr','DBI','RSQLite','here','foreach','optparse','effsize','weights','sjstats','BiocManager'))
+BiocManager::install(c('AnnotationHub','biomaRt','clusterProfiler','DESeq2','GenomicRanges','msigdbr','TCGAbiolinks','SummarizedExperiment','plyranges','rCGH','apeglm'))
+
+
