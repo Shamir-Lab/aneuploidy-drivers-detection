@@ -22,7 +22,7 @@ configfile: "config.yaml"
 import pandas as pd
 
 # Read arm and cancer type pairs from a CSV file for pairing inputs
-pairs_df = pd.read_csv(config["data_folder"] + "/arm_deletion_frequencies.csv")
+pairs_df = pd.read_csv(config["data_folder"] + "/arm_cancer_type_paires.csv")
 pairs = list(pairs_df.itertuples(index=False, name=None))
 
 rule test:
