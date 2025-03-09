@@ -58,3 +58,37 @@ To run the pipeline, execute the following commands:
 ```bash
 cd snakemake_scripts
 snakemake all --cores NUMBER_OF_CORES_TO_USE
+```
+
+---
+
+### Running MutSig2CV and GISTIC2
+
+We encountered errors when trying to run multiple instances of these tools in parallel, so we created several Docker containers for each tool. The Docker image for **GISTIC2** is available [here](https://hub.docker.com/r/shixiangwang/gistic) and for **MutSigCV** [here](https://hub.docker.com/r/genepattern/mutsigcv).
+
+Note that the MutSigCV container does not actually have MutSig2CV installed and is only used for its Matlab setup. Alternatively, you can use a Docker image that includes MutSig2CV.
+
+Download MutSig2CV by executing the following commands from the root of the repository:
+
+```bash
+wget http://software.broadinstitute.org/cancer/cga/sites/default/files/data/tools/mutsig/MutSig2CV.tar.gz
+tar -xvzf MutSig2CV.tar.gz
+```
+
+The markers, reference, and CNV files required for running **GISTIC2** are also available [here](TODO) and should be placed in the `data` directory. These files were also downloaded from [Broad GDAC](https://gdac.broadinstitute.org/).
+
+There are 460 runs of each tool, so the process can take a long time. Using 5 containers for each tool, the runs took approximately 72 hours. They can be executed in parallel. Note that for step 3, only the GISTIC2 results are needed.
+
+To run all GISTIC instances, first insert the container names in the `container_names` list in `code/run_gistic.sh`, then run the script from the `code` directory:
+
+```bash
+cd code
+./run_gistic.sh out data log/GISTIC
+```
+
+To run all MutSig2CV instances, first insert the container names in the `container_names` list in `code/run_mutsig.sh`, then run the script from the `code` directory (preferably in a different terminal to run these in parallel):
+
+```bash
+cd code
+./run_mutsig.sh out data log/MutSig
+```
