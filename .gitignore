@@ -1,10 +1,16 @@
+config.yaml
+
 /data/MC3MAF.sqlite
 /data/SNP6.merged.151117.hg19.CNV.txt
 /data/hg19_GENCODE_v18_20140127.mat
 /data/genome.info.6.0_hg19.na31_minus_frequent_nan_probes_sorted_2.1.txt
-
+/data/grch19_chromosomes.rds
+/data/grch37.rds
 /data/HiSeq/
 /data/STAR/
 /data/gistic/
+
+/output/
+/log/
 
 **/.snakemake/

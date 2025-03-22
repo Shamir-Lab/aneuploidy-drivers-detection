@@ -202,7 +202,6 @@ rule generate_IPTW_anp_effect:
             --cancer-type {wildcards.cancer_type} \
             --arm {wildcards.arm} \
             --raw-counts-path {input.raw_counts_path} \
-            --anp-csv-path {input.anp_csv_path} \
             --out {config[out_folder]}/{wildcards.arm}/{wildcards.cancer_type} \
             > {log} 2>&1
         """
@@ -369,7 +368,6 @@ rule generate_sample_groups:
         Rscript --no-save --no-restore generate_sample_groups.R \
             --cancer-type {wildcards.cancer_type} \
             --arm {wildcards.arm} \
-            --arm-deletion-data-path {input.arm_deletion_data} \
             --out {config[out_folder]}/{wildcards.arm}/{wildcards.cancer_type} \
             > {log} 2>&1
         """
