@@ -22,7 +22,6 @@
 
 suppressPackageStartupMessages({
   library(here)
-  set_here(path = normalizePath('..'))
   # Set AnnotationHub to use local cache
   library(AnnotationHub)
   AnnotationHub::setAnnotationHubOption("LOCAL", TRUE)

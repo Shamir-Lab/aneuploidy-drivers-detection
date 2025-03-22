@@ -1,12 +1,12 @@
-source(here::here('constants.R'))
-
-
 library(stringr)
 library(dplyr)
 library(biomaRt)
 library(rCGH)
 library(GenomicRanges)
 library(plyranges)
+
+library(here)
+source(here::here('code/utils.R'))
 
 
 get_genes_form_biomaRt <- function(GRCh.version = '37'){
@@ -16,7 +16,7 @@ get_genes_form_biomaRt <- function(GRCh.version = '37'){
   }
   
   GRCh.version.name <- paste0('grch',GRCh.version)
-  genes.rds.path <- here::here(DATA.DIR,paste0(GRCh.version.name,'.rds'))
+  genes.rds.path <- here::here(load_configuration()$data_folder,paste0(GRCh.version.name,'.rds'))
   if(file.exists(genes.rds.path)){
     return(readRDS(genes.rds.path))
   }
@@ -58,7 +58,7 @@ arm_to_chromosome <- function(arm){
 }
 
 get_chromosome_info_hg19 <- function(){
-  chromosomes.rds.path <- here::here(DATA.DIR,'grch19_chromosomes.rds')
+  chromosomes.rds.path <- here::here(load_configuration()$data_folder,'grch19_chromosomes.rds')
   if(file.exists(chromosomes.rds.path)){
     return(readRDS(chromosomes.rds.path))
   }

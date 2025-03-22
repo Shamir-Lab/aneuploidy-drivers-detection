@@ -1,6 +1,5 @@
 suppressPackageStartupMessages({
   library(here)
-  set_here(path = normalizePath('..'))
   library(optparse)
   library(TCGAbiolinks)
 })

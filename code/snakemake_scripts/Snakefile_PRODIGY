@@ -1,10 +1,12 @@
-OUT_FOLDER = "/specific/netapp5/gaga/data-scratch/ronsaad/aneuploidy/output/mono_regions2"
-LOG_FOLDER = "/specific/netapp5/gaga/data-scratch/ronsaad/aneuploidy/log/mono_regions2"
-DATA_FOLDER = "/specific/netapp5/gaga/data-scratch/ronsaad/aneuploidy/data"
-MONO_REGIONS_PATH = "/specific/netapp5/gaga/data-scratch/ronsaad/aneuploidy/output/aneuploidy_drivers/mono_cnv_regions.csv"
+configfile: "../../config.yaml"
 
 import pandas as pd
-gistic_regions = pd.read_csv(MONO_REGIONS_PATH).head(1)
+
+OUT_FOLDER = config["out_folder"] + "/PRODIGY"
+LOG_FOLDER = config["log_folder"] + "/PRODIGY"
+
+import pandas as pd
+gistic_regions = pd.read_csv(config["out_folder"] + '/gistic_regions_given_no_arm_loss.csv')
 
 rule all:
   input:
@@ -27,9 +29,9 @@ rule all:
 # ------------------------------------------------------------------------------
 rule run_PRODIGY:
     input:
-        hiSeq_data     = DATA_FOLDER + "/HiSeq/{cancer_type}_HiSeq.rds",
+        hiSeq_data     = config["data_folder"] + "/HiSeq/{cancer_type}_HiSeq.rds",
         
-        seg_file       = DATA_FOLDER + "/gistic/seg_files/{cancer_type}/{cancer_type}.snp__genome_wide_snp_6__broad_mit_edu__Level_3__segmented_scna_minus_germline_cnv_hg19__seg.seg.txt",
+        seg_file       = config["data_folder"] + "/gistic/seg_files/{cancer_type}/{cancer_type}.snp__genome_wide_snp_6__broad_mit_edu__Level_3__segmented_scna_minus_germline_cnv_hg19__seg.seg.txt",
       
         pathway_list   = "/specific/netapp5/gaga/data-scratch/ronsaad/aneuploidy/out/PRODIGY/pathways/reactome.RDS"
     output:

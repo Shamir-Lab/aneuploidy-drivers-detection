@@ -21,7 +21,6 @@
 
 suppressPackageStartupMessages({
   library(here)
-  set_here(path = normalizePath('..'))
   library(optparse)
   library(dplyr)
   library(DBI)

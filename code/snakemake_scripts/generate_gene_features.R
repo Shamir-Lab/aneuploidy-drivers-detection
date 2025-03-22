@@ -28,8 +28,7 @@
 # Load required libraries and source utility functions ----------------------
 suppressPackageStartupMessages({
   library(here)
-  set_here(path=normalizePath('..'))
-  source(here::here('genome_annotation_utils.R'))
+  source(here::here('code/genome_annotation_utils.R'))
   
   library(optparse)
   library(purrr)

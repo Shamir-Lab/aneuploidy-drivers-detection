@@ -17,8 +17,7 @@
 # Load required libraries and set working directory -------------------------
 suppressPackageStartupMessages({
   library(here)
-  set_here(path=normalizePath('..'))
-  source(here::here('genome_annotation_utils.R'))
+  source(here::here('code/genome_annotation_utils.R'))
   
   # Load necessary libraries
   library(optparse)

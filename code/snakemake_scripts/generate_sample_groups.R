@@ -7,7 +7,6 @@
 #
 # Usage:
 #   Rscript generate_aneuploidy_samples.R --cancer-type <cancer_type> 
-#        --arm <arm> --arm-deletion-data-path <path_to_arm_deletion_csv> 
 #        --out <output_folder>
 #
 # Output:
@@ -19,8 +18,7 @@
 # Load required libraries and set working directory -------------------------
 suppressPackageStartupMessages({
   library(here)
-  set_here(path=normalizePath('..'))
-  source(here::here('utils.R'))
+  source(here::here('code/utils.R'))
   
   # Load required packages
   library(optparse)
@@ -45,11 +43,9 @@ suppressPackageStartupMessages({
 #'
 #' @examples
 #' \dontrun{
-#'   data <- read.csv("path/to/arm_deletion_data.csv")
 #'   res <- generate_mut_data("BRCA", "X3p", data)
 #' }
 generate_mut_data <- function(cancer.type_, arm_, arm_deletion_data) {
-  # Use the provided arm deletion data instead of loading from a constant CSV
   anp.data <- arm_deletion_data
   
   # Identify samples with deletion in the specified arm (value == -1)
@@ -81,11 +77,6 @@ option_list <- list(
               default = NULL,
               help = "Chromosome arm name (e.g., 'X3p')",
               metavar = "character"),
-  make_option(c("-d", "--arm-deletion-data-path"),
-              type = "character",
-              default = NULL,
-              help = "Path to CSV with arm deletion data per sample",
-              metavar = "character"),
   make_option(c("-o", "--out"),
               type = "character",
               default = NULL,
@@ -105,8 +96,8 @@ if (any(unlist(lapply(option_list, function(option) {
   stop("Error: All options are mandatory", call. = FALSE)
 }
 
-# Load arm deletion data from the specified CSV file --------------------------
-arm_deletion_data <- load_ANP_data(opt$`arm-deletion-data-path`)$tcga.anp.data
+# Load arm deletion data --------------------------
+arm_deletion_data <- load_ANP_data()$tcga.anp.data
 
 # Generate sample lists for the specified cancer type and chromosome arm ------
 res <- generate_mut_data(opt$`cancer-type`, opt$arm, arm_deletion_data)

@@ -11,7 +11,7 @@ export results_dir="$1"
 export data_dir="$2"
 export log_dir="$3"
 
-container_names=("CONTAINER_NAME_1" "CONTAINER_NAME_2" "CONTAINER_NAME_3")
+container_names=("gistic_new" "gistic" "gistic2" "gistic3" "gistic4")
 num_workers=${#container_names[@]}
 
 # Ensure log directorie exist

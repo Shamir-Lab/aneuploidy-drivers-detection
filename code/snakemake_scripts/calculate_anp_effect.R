@@ -7,19 +7,19 @@
 #   to adjust for differences in aneuploidy scores. The input raw counts are assumed 
 #   to be stored in an RDS file containing a SummarizedExperiment object.
 #
-#   The script loads additional ANP data from a CSV file, filters for protein-coding 
+#   The script loads additional ANP data, filters for protein-coding 
 #   genes in primary tumors, and then computes a weighted t-test for each gene to 
 #   estimate effect sizes. The results (including p-values, effect sizes, and adjusted 
 #   q-values) are written to a CSV file.
 #
 # Usage:
 #   Rscript calculate_anp_effect.R --cancer-type <cancer_type> --arm <arm> 
-#         --raw-counts-path <path_to_raw_counts_RDS> --anp-csv-path <path_to_ANP_CSV> 
+#         --raw-counts-path <path_to_raw_counts_RDS>
 #         --out <output_folder>
 #
 # Example:
 #   Rscript calculate_anp_effect.R --cancer-type BRCA --arm X3p \
-#         --raw-counts-path data/BRCA_raw_counts.rds --anp-csv-path data/ANP_data.csv \
+#         --raw-counts-path data/BRCA_raw_counts.rds \
 #         --out results/
 #
 # Output:
@@ -28,9 +28,8 @@
 
 suppressPackageStartupMessages({
   library(here)
-  set_here(path = normalizePath('..'))
-  source(here::here('utils.R'))
-  source(here::here('genome_annotation_utils.R'))
+  source(here::here('code/utils.R'))
+  source(here::here('code/genome_annotation_utils.R'))
   
   library(optparse)
   library(tidyr)
@@ -49,7 +48,7 @@ suppressPackageStartupMessages({
 #' It performs the following steps:
 #'   1. Filters the raw counts to include only protein-coding genes in primary tumors.
 #'   2. Computes FPKM values and applies a log10 transformation.
-#'   3. Loads additional ANP data from a CSV file and filters it for the specified 
+#'   3. Loads additional ANP data and filters it for the specified 
 #'      cancer type and arm (excluding samples where the arm value is 1).
 #'   4. Fits a logistic regression model (propensity model) and computes stabilized weights.
 #'   5. Merges the expression data with ANP data and calculates effect sizes (Cohen's d)
@@ -58,8 +57,6 @@ suppressPackageStartupMessages({
 #' @param cancer.type Character. The cancer type (e.g., "BRCA").
 #' @param arm Character. The chromosome arm name (e.g., "X3p").
 #' @param raw.counts A SummarizedExperiment object containing raw counts and FPKM values.
-#' @param anp_csv_path Character. Path to the ANP CSV file that contains additional 
-#'        aneuploidy data.
 #'
 #' @return A data frame with columns:
 #'         - name: Gene identifier (external gene name).
@@ -70,9 +67,9 @@ suppressPackageStartupMessages({
 #' @examples
 #' \dontrun{
 #'   se <- readRDS("data/BRCA_raw_counts.rds")
-#'   effect_df <- get_anp_effect("BRCA", "X3p", se, "data/ANP_data.csv")
+#'   effect_df <- get_anp_effect("BRCA", "X3p", se)
 #' }
-get_anp_effect <- function(cancer.type, arm, raw.counts, anp_csv_path) {
+get_anp_effect <- function(cancer.type, arm, raw.counts) {
   
   message("Filtering raw counts for protein-coding genes in primary tumors...")
   raw.counts.tumors <- raw.counts[
@@ -86,8 +83,8 @@ get_anp_effect <- function(cancer.type, arm, raw.counts, anp_csv_path) {
   rownames(fpkm) <- rownames(fpkm) %>% str_sub(1, 15)
   log10_fpkm <- log10(fpkm + 1)
   
-  message("Loading ANP data from CSV: ", anp_csv_path)
-  anp.data <- load_ANP_data(anp_csv_path)$tcga.anp.data
+  message("Loading ANP data")
+  anp.data <- load_ANP_data()$tcga.anp.data
   anp.data <- anp.data %>% 
     dplyr::filter(Type == cancer.type, 1 != !!as.name(arm)) %>% 
     dplyr::mutate(arm.del = (-1 == !!as.name(arm))) %>%
@@ -156,11 +153,6 @@ option_list <- list(
               default = NULL,
               help = "Path to the raw counts file (RDS file with a SummarizedExperiment object)",
               metavar = "character"),
-  make_option(c("-p", "--anp-csv-path"),
-              type = "character",
-              default = NULL,
-              help = "Path to the ANP CSV file (used by load_ANP_data)",
-              metavar = "character"),
   make_option(c("-o", "--out"),
               type = "character",
               default = NULL,
@@ -181,7 +173,7 @@ message("Loading raw counts data from: ", opt$`raw-counts-path`)
 raw_counts <- readRDS(opt$`raw-counts-path`)
 
 message("Calculating ANP effect for cancer type: ", opt$`cancer-type`, " and arm: ", opt$`arm`)
-res <- get_anp_effect(opt$`cancer-type`, opt$`arm`, raw_counts, opt$`anp-csv-path`)
+res <- get_anp_effect(opt$`cancer-type`, opt$`arm`, raw_counts)
 
 # Ensure the output directory exists
 if (!dir.exists(opt$out)) {

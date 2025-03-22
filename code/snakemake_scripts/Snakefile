@@ -17,7 +17,7 @@
 #   snakemake --cores <n>
 #
 # ------------------------------------------------------------------------------
-configfile: "config.yaml"
+configfile: "../../config.yaml"
 
 import pandas as pd
 
@@ -103,7 +103,8 @@ rule create_seg_files:
     input:
         seg_file = config["data_folder"] + "/gistic/seg_files/{cancer_type}/{cancer_type}.snp__genome_wide_snp_6__broad_mit_edu__Level_3__segmented_scna_minus_germline_cnv_hg19__seg.seg.txt",
         aneuploid_samples = config["out_folder"] + "/{arm}/{cancer_type}/aneuploid_samples.csv",
-        non_aneuploid_samples = config["out_folder"] + "/{arm}/{cancer_type}/non_aneuploid_samples.csv"
+        non_aneuploid_samples = config["out_folder"] + "/{arm}/{cancer_type}/non_aneuploid_samples.csv",
+        sample_cutoffs_file = config["data_folder"] + "/gistic/{cancer_type}/sample_cutoffs.txt"
     output:
         config["out_folder"] + "/{arm}/{cancer_type}/aneuploid.seg",
         config["out_folder"] + "/{arm}/{cancer_type}/non_aneuploid.seg"
@@ -117,6 +118,8 @@ rule create_seg_files:
             --seg-path {input.seg_file} \
             --aneuploid-samples-path {input.aneuploid_samples} \
             --non-aneuploid-samples-path {input.non_aneuploid_samples} \
+            --sample-cutoffs-path {input.sample_cutoffs_file} \
+            --arm {wildcards.arm} \
             --out {config[out_folder]}/{wildcards.arm}/{wildcards.cancer_type} \
             > {log} 2>&1
         """
@@ -186,8 +189,7 @@ rule generate_AS_controlled_GSEA:
 # ------------------------------------------------------------------------------
 rule generate_IPTW_anp_effect:
     input:
-        raw_counts_path = config["data_folder"] + "/STAR/{cancer_type}.rds",
-        anp_csv_path = config["data_folder"] + "/Taylor_et_al._Arm-Level_WGD_TCGA_data.csv"
+        raw_counts_path = config["data_folder"] + "/STAR/{cancer_type}.rds"
     output:
         config["out_folder"] + "/{arm}/{cancer_type}/IPTW_anp_effect.csv"
     log:
@@ -355,8 +357,6 @@ rule generate_mutation_matrix:
 # Purpose: Split samples into aneuploid (arm deletion) and non-aneuploid groups.
 # ------------------------------------------------------------------------------
 rule generate_sample_groups:
-    input:
-        arm_deletion_data = config["data_folder"] + "/Taylor_et_al._Arm-Level_WGD_TCGA_data.csv"
     output:
         aneuploid_samples = config["out_folder"] + "/{arm}/{cancer_type}/aneuploid_samples.csv",
         non_aneuploid_samples = config["out_folder"] + "/{arm}/{cancer_type}/non_aneuploid_samples.csv"

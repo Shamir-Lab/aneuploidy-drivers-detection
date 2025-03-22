@@ -27,12 +27,10 @@
 
 suppressPackageStartupMessages({
   library(here)
-  set_here(path = normalizePath('..'))
-  source(here::here('utils.R'))
-  source(here::here('genome_annotation_utils.R'))
+  source(here::here('code/utils.R'))
+  source(here::here('code/genome_annotation_utils.R'))
   
   library(PRODIGY)
-  library(ff)
   library(optparse)
   library(dplyr)
   library(stringr)
@@ -138,8 +136,8 @@ analyse_region <- function(cancer.type, arm, region_start, region_end, HiSeq.dat
   rownames(expression.matrix) <- genes[!duplicated(genes)]
   
   message("Filtering DEG results for significance...")
-  # Filter DEG results: p-value < 0.05 and absolute log2FoldChange > 2
-  DEGs <- dplyr::filter(DEGs, pvalue < 0.05, abs(log2FoldChange) > 2)
+  fold_change_cutoff <- 0.7
+  DEGs <- dplyr::filter(DEGs, pvalue < 0.05, abs(log2FoldChange) > fold_change_cutoff)
   diff_genes <- abs(DEGs$log2FoldChange)
   names(diff_genes) <- map_gene_identifiers(rownames(DEGs), 'ensembl_gene_id', 'external_gene_name')
   
@@ -153,7 +151,7 @@ analyse_region <- function(cancer.type, arm, region_start, region_end, HiSeq.dat
   res <- PRODIGY(mutated_genes = candidate_genes,
                  expression_matrix = expression.matrix, network = network, sample = NULL,
                  diff_genes = diff_genes, alpha = 0.05, pathway_list  = pathway.list,
-                 write_results = FALSE, beta = 2, gamma = 0.05, delta = 0.05,
+                 write_results = FALSE, beta = fold_change_cutoff, gamma = 0.05, delta = 0.05,
                  num_of_cores = 1)
   
   return(res)

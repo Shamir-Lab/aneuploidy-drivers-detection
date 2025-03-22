@@ -2,9 +2,9 @@
 # ------------------------------------------------------------------------------
 # Script: filter_seg_files.R
 # Description:
-#   This script reads an input segmentation (.seg) file and two CSV files that 
-#   contain lists of sample IDs for aneuploid and non-aneuploid samples. It then 
-#   creates two new segmentation files: one containing only the rows for samples 
+#   This script reads an input segmentation (.seg) file, two CSV files that 
+#   contain lists of sample IDs for aneuploid and non-aneuploid samples and a file with sample cutoffs.
+#   It then creates two new segmentation files: one containing only the rows for samples 
 #   in the aneuploid list, and another containing only rows for samples in the 
 #   non-aneuploid list.
 #
@@ -12,6 +12,8 @@
 #   Rscript filter_seg_files.R --seg-path <path_to_seg_file> 
 #         --aneuploid-samples-path <path_to_aneuploid_csv> 
 #         --non-aneuploid-samples-path <path_to_non_aneuploid_csv> 
+#         --sample-cutoffs-path <path_to_sample_cutoffs_path> 
+#         --arm <arm> 
 #         --out <output_folder>
 #
 # Example:
@@ -28,7 +30,8 @@
 
 suppressPackageStartupMessages({
   library(here)
-  set_here(path = normalizePath('..'))
+  source(here::here('code/genome_annotation_utils.R'))
+  
   library(optparse)
   library(dplyr)
   library(stringr)
@@ -50,6 +53,16 @@ option_list <- list(
               type = "character",
               default = NULL,
               help = "Path to CSV file containing the list of non-aneuploid sample IDs.",
+              metavar = "character"),
+  make_option(c("--sample-cutoffs-path"),
+              type = "character",
+              default = NULL,
+              help = "Path to sample cutoffs file.",
+              metavar = "character"),
+  make_option(c("-a", "--arm"),
+              type = "character",
+              default = NULL,
+              help = "Chromosome arm name (e.g., 'X3p')",
               metavar = "character"),
   make_option(c("-o", "--out"),
               type = "character",
@@ -79,10 +92,19 @@ aneuploid_samples <- read.csv(opt$`aneuploid-samples-path`, row.names = 1)$x
 message("Reading non-aneuploid sample list from: ", opt$`non-aneuploid-samples-path`)
 non_aneuploid_samples <- read.csv(opt$`non-aneuploid-samples-path`, row.names = 1)$x
 
+message("Reading sample cutoffs from: ", opt$`non-aneuploid-samples-path`)
+sample.cutoffs <- read.csv(opt$`sample-cutoffs-path`,header = T,sep = '\t',skip = 1)
+
 # Filter the segmentation data based on the sample lists
 message("Filtering segmentation data for aneuploid samples...")
-seg_aneuploid <- seg_data %>% filter(str_sub(Sample,1,15) %in% aneuploid_samples)
-
+seg_aneuploid <- seg_data %>% filter(str_sub(Sample,1,15) %in% aneuploid_samples) %>% 
+  merge(sample.cutoffs,by ='Sample') %>% 
+  dplyr::mutate(Segment_Mean = ifelse(
+    (Chromosome == arm_to_chromosome(opt$arm)) & (Segment_Mean > Low) & (Segment_Mean <= -0.1),
+    0,Segment_Mean)) %>%
+  dplyr::select(-Low,- High) %>% 
+  dplyr::arrange(Sample,Chromosome, Start, End, Num_Probes, Segment_Mean) 
+  
 message("Filtering segmentation data for non-aneuploid samples...")
 seg_non_aneuploid <- seg_data %>% filter(str_sub(Sample,1,15) %in% non_aneuploid_samples)
 

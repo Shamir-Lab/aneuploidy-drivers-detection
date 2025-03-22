@@ -23,7 +23,6 @@
 # Load required libraries with suppressed startup messages -------------------
 suppressPackageStartupMessages({
   library(here)
-  set_here(path = normalizePath('..'))
   # AnnotationHub is set to use the local cache
   library(AnnotationHub)
   AnnotationHub::setAnnotationHubOption("LOCAL", TRUE)

@@ -10,7 +10,7 @@ fi
 export results_dir="$1"
 export log_dir="$2"
 
-container_names=("CONTAINER_NAME_1" "CONTAINER_NAME_2" "CONTAINER_NAME_3")
+container_names=("mutsig_new" "mutsigcv2" "mutsigcv3" "mutsigcv4")
 num_workers=${#container_names[@]}
 
 # Ensure log directorie exist
