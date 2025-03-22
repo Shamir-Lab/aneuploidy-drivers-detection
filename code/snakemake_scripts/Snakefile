@@ -390,24 +390,3 @@ rule generate_mutation_sqldb:
             --out {config[data_folder]}/MC3MAF.sqlite \
             > {log} 2>&1
         """
-
-# ------------------------------------------------------------------------------
-# Rule: download_gistic_data
-# Purpose: Download and extract GISTIC data for a specified cancer type.
-#          The GISTIC results are downloaded from Firebrowse and the extracted
-#          files are saved into a subdirectory of config["data_folder"] corresponding
-#          to the cancer type.
-# ------------------------------------------------------------------------------
-rule download_gistic_data:
-    output:
-        gistic_data = config["data_folder"] + "/gistic_data/{cancer_type}/all_data_by_genes.txt"
-    log:
-        config["log_folder"] + "/{cancer_type}/download_gistic_data.log"
-    shell:
-        """
-        mkdir -p {config[data_folder]}/gistic_data/{wildcards.cancer_type} {config[log_folder]}/{wildcards.cancer_type}
-        Rscript --no-save --no-restore download_gistic_data.R \
-            --cancer-type {wildcards.cancer_type} \
-            --out {config[data_folder]}/gistic_data/{wildcards.cancer_type}/ \
-            > {log} 2>&1
-        """
