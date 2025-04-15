@@ -1,5 +1,6 @@
 config.yaml
 
+/data/reactome.RDS
 /data/MC3MAF.sqlite
 /data/SNP6.merged.151117.hg19.CNV.txt
 /data/hg19_GENCODE_v18_20140127.mat
@@ -12,5 +13,6 @@ config.yaml
 
 /output/
 /log/
+/mutsig2cv/
 
 **/.snakemake/

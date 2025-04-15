@@ -10,7 +10,7 @@ fi
 export results_dir="$1"
 export log_dir="$2"
 
-container_names=("mutsig_new" "mutsigcv2" "mutsigcv3" "mutsigcv4")
+container_names=("mutsigcv1" "mutsigcv2" "mutsigcv3" "mutsigcv4")
 num_workers=${#container_names[@]}
 
 # Ensure log directorie exist
@@ -50,7 +50,7 @@ export log_dir
 # Create a temporary file that pairs each seg file with a container name using round-robin assignment
 temp_file=$(mktemp)
 index=0
-for mutations_file in $(find $results_dir  -type f -name "*aneuploid_mutations.tsv")
+for mutations_file in $(find $results_dir  -type f -name "aneuploid_mutations.tsv")
 do
     # Select container name by modulating index with number of containers
     container="${container_names[$((index % num_workers))]}"

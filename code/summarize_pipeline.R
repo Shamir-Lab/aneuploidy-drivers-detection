@@ -1,4 +1,5 @@
 library(here)
+library(plyr)
 library(dplyr)
 library(tidyr)
 library(stringr)
@@ -275,9 +276,3 @@ load_co_mutation_results <- function(){
   # write.csv(all.mut.res.filterd, save.to, row.names = F)
   return(all.mut.res.filterd)
 }
-
-
-old_seg = read.table('/specific/netapp5/gaga/data-scratch/ronsaad/aneuploidy/data/gistic/anp/new/BLCA_X10q_del.seg.txt',
-                     sep = '\t', header = T)
-new_seg = read.table('/specific/netapp5/gaga/data-scratch/ronsaad/aneuploidy/output/snakemake_final/X10q/BLCA/aneuploid.seg',
-           sep = '\t', header = T)

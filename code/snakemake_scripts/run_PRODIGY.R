@@ -59,6 +59,7 @@ get_deletion_DEG <- function(HiSeq.data, seg.data, region) {
   
   # Select primary tumor samples
   cancer.sample.ids <- subset(HiSeq.data, select = colData(HiSeq.data)$sample_type == 'Primary Tumor')$sample
+  normal.sample.ids <- subset(HiSeq.data, select = colData(HiSeq.data)$sample_type=='Solid Tissue Normal')$sample
   
   # Convert segmentation data to GRanges
   seg.data <- GRanges(seg.data)
@@ -76,7 +77,8 @@ get_deletion_DEG <- function(HiSeq.data, seg.data, region) {
   samples_without_deletion <- intersect(samples_without_deletion, str_sub(seg.data$Sample, 1, 15))
   
   # Filter HiSeq data for relevant samples
-  HiSeq.data.filtered <- subset(HiSeq.data, select = (colData(HiSeq.data)$sample %in% c(samples_with_deletion, samples_without_deletion)))
+  # HiSeq.data.filtered <- subset(HiSeq.data, select = (colData(HiSeq.data)$sample %in% c(samples_with_deletion, samples_without_deletion)))
+  HiSeq.data.filtered <- subset(HiSeq.data, select = (colData(HiSeq.data)$sample %in% c(samples_with_deletion, normal.sample.ids)))
   expression.matrix <- assay(HiSeq.data.filtered, "raw_count")
   
   # Ensure unique gene identifiers
@@ -136,7 +138,7 @@ analyse_region <- function(cancer.type, arm, region_start, region_end, HiSeq.dat
   rownames(expression.matrix) <- genes[!duplicated(genes)]
   
   message("Filtering DEG results for significance...")
-  fold_change_cutoff <- 0.7
+  fold_change_cutoff <- 2
   DEGs <- dplyr::filter(DEGs, pvalue < 0.05, abs(log2FoldChange) > fold_change_cutoff)
   diff_genes <- abs(DEGs$log2FoldChange)
   names(diff_genes) <- map_gene_identifiers(rownames(DEGs), 'ensembl_gene_id', 'external_gene_name')

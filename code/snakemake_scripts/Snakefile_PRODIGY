@@ -33,7 +33,7 @@ rule run_PRODIGY:
         
         seg_file       = config["data_folder"] + "/gistic/seg_files/{cancer_type}/{cancer_type}.snp__genome_wide_snp_6__broad_mit_edu__Level_3__segmented_scna_minus_germline_cnv_hg19__seg.seg.txt",
       
-        pathway_list   = "/specific/netapp5/gaga/data-scratch/ronsaad/aneuploidy/out/PRODIGY/pathways/reactome.RDS"
+        pathway_list   = config["data_folder"] + "/reactome.RDS"
     output:
         res = OUT_FOLDER + "/{index}_{cancer_type}_{arm}_{region_start}_{region_end}_res.csv"
     log:
