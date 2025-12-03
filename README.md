@@ -1,6 +1,6 @@
 # Integrating Gene Expression, Mutation and Copy Number Data to Identify Driver Genes of Recurrent Chromosome-Arm Losses
 
-This repository contains the code associated with the paper **“Integrating Gene Expression, Mutation and Copy Number Data to Identify Driver Genes of Recurrent Chromosome-Arm Losses.”** The manuscript is available [here](doi:10.1016/j.celrep.2025.116455).
+This repository contains the code associated with the paper **“Integrating Gene Expression, Mutation and Copy Number Data to Identify Driver Genes of Recurrent Chromosome-Arm Losses.”** The manuscript is available [here](https://doi.org/10.1016/j.celrep.2025.116455)).
 
 ---
 
